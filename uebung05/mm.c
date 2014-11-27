@@ -1,3 +1,7 @@
+//TI3 - Uebung 05
+//Tutor: Thomas
+//Bearbeiter: Jasmine Cavael und Maximilian Stendler
+
 #include "mm.h"
 #include <stdio.h>
 
@@ -37,7 +41,7 @@ void initialize()
 	if(!b_initialized)
 	{
 		//DEBUG
-		printf("Initializing..\n");
+		//printf("Initializing..\n");
 
 		head = (memoryBlock*)memory;
 		//Initialisiere head in unserem Speicher <memory>
@@ -49,7 +53,7 @@ void initialize()
 		// Data beginnt somit nicht am Anfang von <memory>.
 
 		b_initialized = 1;
-		//TODO - needs testing
+		//TODO - needs testing - works
 		//INITIALISIERUNG VON HEAD
 		head->data = head + memoryBlockHeaderSize;
 		head->dataLength = memorySize - memoryBlockHeaderSize;
@@ -57,7 +61,7 @@ void initialize()
 		head->nextBlock = NULL;
 
 		//DEBUG
-		printf("Initialized!");
+		//printf("Initialized!");
 	}
 }
 
@@ -67,7 +71,7 @@ int get_free_space()
 	if(!b_initialized)
 		return -1;
 	//DEBUG
-	printf("Start to look for free space..\n");
+	//printf("Start to look for free space..\n");
 	int count = 0;
 	memoryBlock *block = head;
 	while(block != NULL)
@@ -79,7 +83,7 @@ int get_free_space()
 		block = block->nextBlock;
 	}
 	//DEBUG
-	printf("%d free space found!\n",count);
+	//printf("%d free space found!\n",count);
 	return(count);
 }
 
@@ -92,7 +96,7 @@ void* my_malloc(int byteCount)
 		initialize();
 	}
 	//DEBUG
-	printf("mAllocating..\n");
+	//printf("mAllocating..%d\n",byteCount);
 	//Wenn der insgesamt verfuegbare Speicherplatz kleiner ist
 	//als der angeforderte, koennen wir gleich aufhoeren!
 	if(byteCount > get_free_space())
@@ -100,19 +104,21 @@ void* my_malloc(int byteCount)
 		return(NULL);
 	}
 	memoryBlock *block = head;
-	//TODO - WIP - seems finished - needs testing
+	//TODO - WIP - seems finished - needs testing - works
 	//SUCHE NACH EINEM GEEIGNETEN FREIEN SPEICHERBLOCK, MIT MEHR ALS <byteCount>
 	//VIELEN BYTES
-	//
+	// + memoryBlockHeaderSize ? nvm .. bei einer anforderung die die gesamte blockgroesse benoetigt muss kein header fuer einen splitBlock beruecksichtigt werden
 	memoryBlock *return_blockData = NULL;
 	while(block != NULL)
 	{
-		if(block->dataLength >= byteCount){
-			if(return_blockData == NULL){
-				return_blockData = block;
-			}else{
-				if(return_blockData->dataLength > block->dataLength){
+		if(block->state == not_allocated){
+			if(block->dataLength >= byteCount){
+				if(return_blockData == NULL){
 					return_blockData = block;
+				}else{
+					if(return_blockData->dataLength > block->dataLength){
+						return_blockData = block;
+					}
 				}
 			}
 		}
@@ -123,14 +129,19 @@ void* my_malloc(int byteCount)
 		return NULL;
 	}
 	// Der Knoten block hat genuegend Speicherplatz
-	if((return_blockData->dataLength) > (byteCount+memoryBlockHeaderSize)){
+	//if((return_blockData->dataLength) >= (byteCount+memoryBlockHeaderSize)){
 		//UNTERTEILUNG DIESES BLOCKS, SO DASS NICHT UNNOETIG VIEL SPEICHERPLATZ VERBRAUCHT WIRD#
 		splitBlock(return_blockData,byteCount);
-	}
+	//}else{
+		//ERROR
+		//printf("Nicht genug Platz fuer Speicher %d UND header %d in %d",byteCount,memoryBlockHeaderSize,return_blockData->dataLength);
+
+		//return NULL;
+	//}
 	// UND MARKIERE DIESEN BLOCK
 	return_blockData->state = allocated;
 	//DEBUG
-	printf("mAllocated!\n");
+	//printf("mAllocated!\n");
 	//RueCKGABE DES ZEIGERS AUF DEN ZU BENUTZENDEN SPEICHERBEREICH
 	return return_blockData->data;
 }
@@ -144,49 +155,56 @@ memoryBlock* splitBlock(memoryBlock* block, int byteCount)
 	// Hinweis: Es ist sinnvoll, wenn <block> die Laenge byteCount hat und
 	// der Nachfolger von <block> die Restlaenge umfasst.
 
-	//TODO - WIP - needs testing
+	//TODO - WIP - needs testing - works
 	//IMPLEMENTIEREN
 	//DEBUG
-	printf("splitting block..\n");
+	//printf("splitting block..\n");
 	//BERECHNE DIE GROESSE DES NEUEN UND ALTEN BLOCKS
 	//-current Block size: block->dataLength
 	//-needed Block size: byteCount
 	//-new block size: block->dataLength-byteCount
 	int newBlock_size = block->dataLength-byteCount-memoryBlockHeaderSize;
-	//DEGUG
-	printf("newBlock size: %d\n",newBlock_size);
+	//DEBUG
+	//printf("newBlock size: %d\n",newBlock_size);
 	//-new block size needs to be > memoryBlockHeaderSize
 	//FALLS EIN WEITERER SPEICHERBLOCK IN DEN ALTEN PASST,
 	//DEBUG
-	printf("if %d > %d + %d \n",(int)(block->dataLength),(int)byteCount,(int)memoryBlockHeaderSize);
+	//printf("if %d > %d + %d \n",(int)(block->dataLength),(int)byteCount,(int)memoryBlockHeaderSize);
 	//if((block->dataLength-byteCount) > memoryBlockHeaderSize){
 	//if((int)(block->dataLength) > ((int)byteCount+(int)memoryBlockHeaderSize)){
 	if(newBlock_size > 0){
 		//ERZEUGEN WIR EINEN NEUEN BLOCK, AENHLICH ZU HEAD AM ANFANG
 		//DEBUG
-		printf("new block\n");
-		memoryBlock* newBlock = ((memoryBlock*)(block->data)+byteCount)+1;
+		//printf("new block - %p\n",((memoryBlock*)(block->data)+byteCount+1));
+		//printf("new block - %p\n",(memoryBlock*)(block->data+byteCount+1));
+		memoryBlock* newBlock = (memoryBlock*)((char*)(block->data)+byteCount+1);
 		//DEBUG
-		printf("pointer on data\n");
-		newBlock->data 			 	= newBlock + memoryBlockHeaderSize;
+		//printf("pointer on data - %p \n",newBlock + memoryBlockHeaderSize);
+		newBlock->data 			 	= (void*)((char*)newBlock + memoryBlockHeaderSize);
 		//DEBUG
-		printf("dataLength\n");
+		//printf("dataLength - %d\n",block->dataLength-byteCount-memoryBlockHeaderSize);
 		newBlock->dataLength	= block->dataLength-byteCount-memoryBlockHeaderSize;
 		//DEBUG
-		printf("state\n");
+		//printf("state\n");
 		newBlock->state				= not_allocated;
 		//DEBUG
-		printf("nextBlock pointer\n");
+		//printf("nextBlock pointer\n");
 		newBlock->nextBlock		= block->nextBlock;
 		//LEGE DEN NEUEN BLOCK ALS NACHFOLGER VOM ALTEN BLOCK FEST
 		//DEBUG
-		printf("prev nexB = newB\n");
+		//printf("prev nexB = newB\n");
 		block->nextBlock = newBlock;
 		// PASSE DIE LAENGE VOM ALTEN BLOCK AN
 		block->dataLength = byteCount;
+
+		//DEBUG
+		//printf("block splitted\n");
+	}else{
+		//kein split noetig, wenn kein speicher,da
+
+		//DEBUG
+		//printf("no split possible\n");
 	}
-	//DEBUG
-	printf("block splitted\n");
 	return block;
 }
 
@@ -200,9 +218,9 @@ void my_free(void* p)
 	{
 		return;
 	}
-	//TODO - WIP - needs testing
+	//TODO - WIP - needs testing - works
 	//DEBUG
-	printf("mfree: look for pointer..\n");
+	//printf("mfree: look for pointer..\n");
 	// SUCHE NACH DEM BLOCK MIT ZEIGER <p>
 	memoryBlock *block = head;
 	while (block != NULL){
@@ -226,22 +244,28 @@ void my_free(void* p)
 //Diese Funktion verschmilzt benachbarte, nicht benutzte Speicherbloecke
 void mergeFreeBlocks()
 {
-	//TODO - WIP - needs testing
+	//TODO - WIP - needs testing - tested & works
 	//DEBUG
-	printf("merging free blocks..\n");
+	//printf("merging free blocks..\n");
 	// BEGINNE AM ANFANG DER LISTE
 	memoryBlock* block = head;
-	while(block != NULL){
+	while(block != NULL && block->nextBlock != NULL){
 		// WENN DER AKTUELLE UND DER BENACHBARTE BLOCK FREI SIND,
 		if((block->state == not_allocated) && (block->nextBlock->state == not_allocated)){
+			//DEBUG
+			//printf("block to merge found\n");
 			// DANN VERSCHMELZE DIESE INDEM DIE DATENLAENGE
 			block->dataLength += (memoryBlockHeaderSize+block->nextBlock->dataLength);
 			// UND DER NACHFOLGER VOM AKTUELLEN BLOCK ANGEPASST WERDEN.
 			block->nextBlock = block->nextBlock->nextBlock;
+			//DEBUG
+			//printf("blocks merged\n");
+		}else{
+			block = block->nextBlock;
 		}
 	}
 	//DEBUG
-	printf("blocks merged\n");
+	//printf("finished merging\n");
 }
 
 //Diese Funktion gibt eine Uebersicht ueber die vorhandenen Speicherbloecke aus
@@ -259,8 +283,8 @@ void status()
 	printf("#  at\t\t allocated\t space\t data\t\t\tnext block\n");
 	while(block != NULL)
 	{
-		//TODO: WARNINGS - evtl (void*) pointer casten vor den  memoryBlock pointern?
-		printf("%d  %p\t %s \t\t %d\t [%p,%p]\t%p\n", ++count, block, boolStr[block->state], block->dataLength, (block->data), ((char*)block->data + block->dataLength-1), (block->nextBlock));
+		//TODO: WARNINGS - evtl (void*) pointer casten vor den  memoryBlock pointern? Wer auch immer das Framework erstellt hat, hat wohl ein paar Warnings ignoriert...
+		printf("%d  %p\t %s \t\t %d\t [%p,%p]\t%p\n", ++count, /*added cast*/(void*)block, boolStr[block->state], block->dataLength, (block->data), (char*)block->data + block->dataLength-1, /*added void cast*/(void*)(block->nextBlock));
 		block = block->nextBlock;
 	}
 	printf("\n\n");
